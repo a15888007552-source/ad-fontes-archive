@@ -1,0 +1,42 @@
+name: ingest-originals
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch originals from main repo (sparse, blobless)
+        run: |
+          git clone --no-checkout --filter=blob:none https://github.com/a15888007552-source/ad-fontes.git /tmp/main
+          cd /tmp/main
+          git sparse-checkout init --cone
+          git sparse-checkout set assets/photos/original
+          git checkout
+          echo "主仓库原图数: $(find assets/photos/original -type f | wc -l)"
+
+      - name: Stage into archive repo
+        run: |
+          mkdir -p assets/photos
+          cp -r /tmp/main/assets/photos/original assets/photos/
+          rm -rf /tmp/main
+          echo "待提交文件数: $(find assets/photos/original -type f | wc -l)"
+
+      - name: Commit and push
+        run: |
+          git config user.name "Ad Fontes Archive Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "ingest: 相机原图归档（assets/photos/original）" || echo "无可提交变更"
+          git push origin main
+
+      - name: Report
+        run: |
+          echo "归档原图数: $(find assets/photos/original -type f | wc -l)"
+          du -sh assets/photos/original
+          ls assets/photos/original | head -5
